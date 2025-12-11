@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Forensic MCQ - Exact & Multi</title>
+    <style>
+        :root {
+            --ios-blue: #007aff;
+            --ios-green: #34c759;
+            --ios-red: #ff3b30;
+            --ios-gray: #f2f2f7;
+            --card-bg: #ffffff;
+            --text-main: #1c1c1e;
+            --text-sec: #8e8e93;
+            --missed-color: #ff9500;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--ios-gray);
+            color: var(--text-main);
+            margin: 0;
+            padding: 15px;
+            -webkit-text-size-adjust: 100%;
+            padding-bottom: 80px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--ios-blue);
+            margin: 10px 0 5px 0;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-sec);
+        }
+
+        .question-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: opacity 0.3s;
+        }
+
+        .question-card.locked {
+            opacity: 0.95;
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .question-number {
+            font-size: 0.75rem;
+            color: var(--text-sec);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .question-text {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 18px;
+            line-height: 1.4;
+            white-space: pre-line; /* Respects line breaks from PDF if needed */
+        }
+
+        .options-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .option-item {
+            margin-bottom: 12px;
+        }
+
+        /* Checkbox styling adapted for iOS feel */
+        label {
+            display: flex;
+            align-items: flex-start;
+            padding: 16px;
+            background-color: #f9f9f9;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        label:active {
+            background-color: #e5e5ea;
+            transform: scale(0.98);
+        }
+
+        /* Input styling */
+        input[type="checkbox"] {
+            margin-right: 14px;
+            margin-top: 4px;
+            transform: scale(1.5); /* Bigger touch target */
+            flex-shrink: 0;
+            accent-color: var(--ios-blue);
+        }
+
+        /* --- FEEDBACK STYLES --- */
+        
+        /* Correctly selected */
+        label.show-correct-selected {
+            background-color: #e8f5e9;
+            border-color: var(--ios-green);
+            color: #1b5e20;
+        }
+        
+        /* Incorrectly selected */
+        label.show-wrong-selected {
+            background-color: #ffebee;
+            border-color: var(--ios-red);
+            color: #b71c1c;
+        }
+
+        /* Correct but MISSED (not selected) */
+        label.show-correct-missed {
+            border: 2px dashed var(--ios-green);
+            background-color: #f0fff4;
+            opacity: 0.8;
+        }
+
+        .check-btn {
+            display: block;
+            width: 100%;
+            background-color: var(--ios-blue);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 20px;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: background 0.2s;
+        }
+
+        .check-btn:disabled {
+            background-color: #c7c7cc;
+            cursor: default;
+        }
+
+        .feedback {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            display: none;
+            line-height: 1.5;
+            background-color: #f1f8ff;
+            border: 1px solid #c8e1ff;
+            color: #004085;
+        }
+
+        .footer-spacer {
+            height: 50px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Forensic MCQ</h1>
+        <div class="subtitle">Exact Transcription • Multi-Choice</div>
+    </header>
+    
+    <div id="quiz-container">
+        </div>
+    
+    <div class="footer-spacer"></div>
+
+    <script>
+        // DATABASE
+        // t: Question Text (Verbatim)
+        // o: Options (Verbatim)
+        // a: Array of correct indices [0, 1...] (Inferred from medical knowledge)
+        // type: 'multi' (default) or 'open' (for Q44)
+
+        const db = [
+            { 
+                t: "1. Correct answers are:", 
+                o: [
+                    "a. If a death is natural and a doctor can sign a death, the process of disposal of the body can be completed",
+                    "b. If the death is not natural or if no doctor can complete a death certificate, the body can be cremated",
+                    "c. The types of deaths that cannot be certified by Coroners, procurators fiscal, medical examiners, etc.",
+                    "d. Death certificate if not mandatory for burial process"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "2. Correct answers are:", 
+                o: [
+                    "a. Any medico-legal report must be prepared and written with care because it will either constitute the medical evidence on that aspect of a case or it will be the basis of any oral evidence that may be given in the future.",
+                    "b. Any medical report or statement submitted to courts should always be scrutinized by the author prior to signing and submitting it to avoid factual errors (e.g. identifying the wrong site of an injury or sloppy typographical errors).",
+                    "c. Any medical report or statement submitted to courts should not be scrutinized by the author prior to signing and submitting it to avoid factual errors (e.g. identifying the wrong site of an injury or sloppy typographical errors)",
+                    "d. If the doctor does not know the answer to the question he should say so, and if necessary ask the judge for guidance in the face of particulary persistent counse"
+                ], 
+                a: [0, 1, 3] 
+            },
+            { 
+                t: "3. The GMC regulatory receives complaints from patients who feel that doctors have behaved inappropriately during an intimate examination.\nWhen conducting intimate examinations you should:", 
+                o: [
+                    "a. Explain to the patient why an examination is necessary and give the patient an opportunity to ask questions",
+                    "b. Keep discussion relevant and avoid unnecessary personal comments",
+                    "c. Do not keep discussion relevant and do not avoid unnecessary personal comments",
+                    "d. Give the patient privacy to undress and dress and use drapes to maintain the patient's dignity"
+                ], 
+                a: [0, 1, 3] 
+            },
+            { 
+                t: "4. The aims of the medico-legal autopsy are to:", 
+                o: [
+                    "a. Identify the body",
+                    "b. Estimate the time of death",
+                    "c. Form an opinion based on information collected from family",
+                    "d. Interpret the significance and effect of the injuries"
+                ], 
+                a: [0, 1, 3] 
+            },
+            { 
+                t: "5. Many autopsies will require ancillary investigations such as:", 
+                o: [
+                    "a. Microscopic analyses",
+                    "b. DNA analyses",
+                    "c. Radiological",
+                    "d. Toxicological"
+                ], 
+                a: [0, 1, 2, 3] 
+            },
+            { 
+                t: "6. Correct facts about Rigor mortis are:", 
+                o: [
+                    "a. Rigor develops uniformly throughout the body but it is generally first detectable in the smaller muscle groups",
+                    "b. Development of Rigor mortis is not influenced by external temperature",
+                    "c. If the body is lying in a warm environment, the onset of rigor and its duration will be short.",
+                    "d. Arises as a consequence of low ATP and high acidity in the muscle tissue"
+                ], 
+                a: [0, 2, 3] 
+            },
+            { 
+                t: "7. Choose the correct answer?", 
+                o: [
+                    "a. Cadaveric rigidity is said to be the stiffness of muscles that has its onset immediately at death, and the basis for the concept is the finding of items gripped firmly in the hand of the deceased before the onset of normal rigor",
+                    "b. Cadaveric rigidity is said to be the stiffness of muscles that begins a few days after death, and the basis for this concept is finding of items gripped firmly in the hand of the deceased before the onset of normal rigor",
+                    "c. Cadaveric rigidity is said to be the stiffness of muscles that has its onset immediately at death, and the basis for this concept is the finding of items gripped firmly in the hand of the deceased after the onset of normal rigor"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "8. Correct facts about Post-mortem hypostasis (Livor mortis) are:", 
+                o: [
+                    "a. Colour changes may act as indicators of possible causes of death",
+                    "b. Compression of skin in contact with a firm surface prevents the formation of Livor mortis",
+                    "c. The site and distribution of the hypostasis must be considered in the light of the position of the body aftermdeath",
+                    "d. It will always be clearly present on the body after death"
+                ], 
+                a: [0, 1, 2] 
+            },
+            { 
+                t: "9. Factors affecting the rate of cooling of a body are:", 
+                o: [
+                    "a. Clothing",
+                    "b. Gender",
+                    "c. Mass of the body",
+                    "d. Race"
+                ], 
+                a: [0, 2] 
+            },
+            { 
+                t: "10. Choose correct answer/s:", 
+                o: [
+                    "a. Decomposition/putrefaction will advance faster in a warm environment",
+                    "b. Decomposition/putrefaction will advance faster in a cold environment",
+                    "c. Decomposition/putrefaction does not depend on the environment",
+                    "d. It will always advance at the same speed",
+                    "e. In temperate climates, the process is usually first visible to the naked eye at about 3-4 days as an area of green discoloration of the right iliac fossa of the anterior abdominal wall."
+                ], 
+                a: [0, 4] 
+            },
+            { 
+                t: "11. Choose correct answer/s:", 
+                o: [
+                    "a. The first change that affects the body in water is the loss of epidermis.",
+                    "b. Gaseous decomposition progresses, and the bloated body is often, but not always, lifted to the surface by these gases, most commonly at about 1 week, but this time is extremely variable.",
+                    "c. Exposure to water cannot predispose to the formation of adipocere, but this is unusual unless a body lies underwater for many weeks."
+                ], 
+                a: [0, 1] 
+            },
+            { 
+                t: "12. Two main types of haemorrhage within the skull each resulting in haemorrhage in different planes cavity are:", 
+                o: [
+                    "a. Extradural haemorrhage.",
+                    "b. Subdural haemorrhage",
+                    "c. Subarachnoid haemorrhage"
+                ], 
+                a: [0, 1] 
+            },
+            { 
+                t: "13. Correct facts about Coronary artery disease are:", 
+                o: [
+                    "a. Ischemia does not always lead to myocardial infarction",
+                    "b. Haemopericardium and cardiac tamponade can be formed between 3 days and 1 week after the clinical onset of the infarct.",
+                    "c. Myocardial infarction occurs when there is severe stenosis or complete occlusion of a coronary artery",
+                    "d. Myocardial ischemia can lead to arrhythmia"
+                ], 
+                a: [0, 1, 2, 3] 
+            },
+            { 
+                t: "14. Blunt-force injuries are:", 
+                o: [
+                    "a. Stab wound",
+                    "b. Gunshot wound",
+                    "c. Lacerations",
+                    "d. Fractures",
+                    "e. Abrasions"
+                ], 
+                a: [2, 3, 4] 
+            },
+            { 
+                t: "15. 'Tramline' bruises are those caused by impacts from:", 
+                o: [
+                    "a. Cylindrical object",
+                    "b. Round object",
+                    "c. Sharp object",
+                    "d. Flat object"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "16. By examining the abrasion, it is possible to determine:", 
+                o: [
+                    "a. Exact shape of wounding object",
+                    "b. Determination of the exact point of contact",
+                    "c. Direction of the impact",
+                    "d. Is it made antemortem or postmortem"
+                ], 
+                a: [1, 2, 3] 
+            },
+            { 
+                t: "17. Coup and contrecoup injuries of the brain:", 
+                o: [
+                    "a. In contrecoup injuries, there are frequently cerebral contusions at sites distant from the primary impact",
+                    "b. A coup injury is usually represented by localized subarachnoid hemorrhage and cortical surface contusion",
+                    "c. Contrecoup contusions are most commonly seen on the under-surfaces of the frontal and temporal lobes following a fall onto the back of the head",
+                    "d. A coup injury to the brain occurs at the site of primary impact"
+                ], 
+                a: [0, 1, 2, 3] 
+            },
+            { 
+                t: "18. Correct answers related to intracranial hemorrhages are:", 
+                o: [
+                    "a. The venous bleeding lies in the subdural space",
+                    "b. Artery injuries are associated with rotational or shearing forces",
+                    "c. Extradural hemorrhage is associated with damage to the meningeal artery",
+                    "d. Chronic extradural hematomas are also seen in those prone to frequent falls, such as those with alcohol dependencies"
+                ], 
+                a: [0, 3] 
+            },
+            { 
+                t: "19. Characteristics of gunshot injuries in suicide:", 
+                o: [
+                    "a. People almost never shoot themselves in the eye or abdomen",
+                    "b. Suicide can be ruled out if there are multiple firearm wounds",
+                    "c. It may be expected that the deceased's DNA or fingerprints will be present on the weapon (unless gloves were worn).",
+                    "d. Wounds must always have the site and range of which are within the reach of the deceased's arm"
+                ], 
+                a: [0, 2, 3] 
+            },
+            { 
+                t: "20. Entry gunshot wound characteristics:", 
+                o: [
+                    "a. There is an 'abrasion collar' or 'abrasion rim' around the hole",
+                    "b. Defect is commonly slightly bigger than the diameter of the missile",
+                    "c. Over 1 m or so, there can be no smoke soiling, burning, or powder tattooing"
+                ], 
+                a: [0, 2] 
+            },
+            { 
+                t: "21. Contrecoup contusions, are most commonly seen on under surfaces of the:", 
+                o: [
+                    "a. Frontal and temporal lobes following a fall onto the back of the head",
+                    "b. Frontal and parietal lobes following a fall onto the back of the head",
+                    "c. Fontal and occipital lobes following a fall onto the back of the head",
+                    "d. Parietal and temporal lobes following a fall onto the back of the head"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "22. Choose correct answer/s:", 
+                o: [
+                    "a. Penetrating injuries of the chest, whether (stab wounds) or gunshot wounds, may result in damage to any of the organs or vessels within the thoracic cavities",
+                    "b. The effect of the penetration will depend mainly upon which organ(s) or vessel(s) are injured",
+                    "c. Penetration of the chest wall can lead to the development of pneumothorax, hemothorax, or a combination (haemo-pneumothorax)",
+                    "d. The effect of the penetration will not depend mainly upon which organ(s) or vessels) are injured."
+                ], 
+                a: [0, 1, 2] 
+            },
+            { 
+                t: "23. Bite marks can be seen in:", 
+                o: [
+                    "a. Sexual assaults",
+                    "b. Child abuse",
+                    "c. occasionally on the sports field"
+                ], 
+                a: [0, 1, 2] 
+            },
+            { 
+                t: "24. A predisposing cause for pulmonary thromboembolism:", 
+                o: [
+                    "a. can be identified in a significant proportion of such deaths, including trauma",
+                    "b. oral contraceptive",
+                    "c. smoking cigarettes",
+                    "d. existence in history of metastatic cancer or blood clotting abnormality"
+                ], 
+                a: [0, 1, 2, 3] 
+            },
+            { 
+                t: "25. Recognized conditions leading to intrauterine or peri-mortem death include:", 
+                o: [
+                    "a. Fetal hypoxia",
+                    "b. Placental insufficiency",
+                    "c. Intrauterine infections (viral, bacterial, or fungal)",
+                    "d. The child sexual abuse."
+                ], 
+                a: [0, 1, 2] 
+            },
+            { 
+                t: "26. Correct answers for the estimation of the maturity of a newborn baby or fetus are:", 
+                o: [
+                    "a. After the twentieth week, the length of the fetus in centimeters equals six times the age in months",
+                    "b. Up to the twentieth week, the length of the fetus in centimeters is the square of the age in months",
+                    "a (3rd option). After the twentieth week, the length of the fetus in centimeters is five times the age in months",
+                    "c. Up to the twentieth week, the length of the fetus in centimeters is the square of the age in weeks"
+                ], 
+                a: [1, 2] 
+            },
+            { 
+                t: "27. The likelihood of pain or injury in non-consensual anal intercourse may be increased:", 
+                o: [
+                    "a. In the absence of lubrication",
+                    "b. If force is used",
+                    "c. If someone who has experienced anal intercourse",
+                    "d. If there is great disparity between the size of the anus (which varies little in the adult) and the penis (which may vary a lot)."
+                ], 
+                a: [0, 1, 3] 
+            },
+            { 
+                t: "28. Anal findings in males and females may exclude:", 
+                o: [
+                    "a. Anal/perianal erythema",
+                    "b. Labial fusion",
+                    "c. Anal/perianal bruising",
+                    "d. Anal fissures, lacerations, scars, and tags",
+                    "e. Reflex anal dilatation"
+                ], 
+                a: [1] 
+            },
+            { 
+                t: "29. Motorcycle and pedal cycle injuries:", 
+                o: [
+                    "a. Most injuries to motorcyclists are caused by falling from the machine onto the roadway",
+                    "b. Abrasions caused by contact with the road surface are almost universal",
+                    "c. Most injuries associated with cycles tend to be of mild or moderate severity because of their low speeds",
+                    "d. Injuries to the limbs and to the chest and spine occur very commonly because of contact with other objects or vehicles"
+                ], 
+                a: [0, 1, 2, 3] 
+            },
+            { 
+                t: "30. Choose correct answers:", 
+                o: [
+                    "a. Exposure of living tissue to high temperatures cannot cause damage to cells",
+                    "b. Burns are caused by the transfer of energy from a physical or chemical source into living tissues",
+                    "c. which causes disruption of their normal metabolic processes and commonly leads to irreversible changes that end in tissue death",
+                    "d. Scalds are the most common intentional thermal injury in children.",
+                    "e. Complete epidermal necrosis can occur at 40°C if exposed for 6 hours, while such necrosis occurs within 5 seconds at 40°C and less than 1 second at 50°C"
+                ], 
+                a: [1, 2, 3] 
+            },
+            { 
+                t: "31. Choose incorrect answer:", 
+                o: [
+                    "a. Hyperthermia is a condition where the core body temperature is greater than 40°C (100°F) - occurs when heat is no longer effectively dissipated, leading to excessive heat retention.",
+                    "b. Hyperthermia's development is more likely in those who have taken substances (e.g. drugs, including cocaine and amphetamine) that elevate metabolic rate/heat production or reduce sweating, or in those with medical conditions (e.g. hyperthyroidism).",
+                    "c. Autopsy findings in 'heat illness', including 'heat stroke,' are specific but cannot include pulmonary and/or cerebral edema, visceral surface petechiae, and features in keeping with 'shock' and multiple organ failure in those who survive for a short period."
+                ], 
+                a: [2] 
+            },
+            { 
+                t: "32. What is correct for \"Drug idiosyncrasies\":", 
+                o: [
+                    "a. This term is used to describe unanticipated drug reactions",
+                    "b. It includes hypersensitivity reactions, where an inappropriate and excessive reaction to an allergen (such as pollen, dust, animal hair, or certain foods) causes symptoms",
+                    "c. This term describes unanticipated symptoms and signs that result after two or more different drugs have been given",
+                    "d. For the most part, these reactions are allergic in nature"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "33. Specific toxicology testing, matrices exclude:", 
+                o: [
+                    "a. Skin",
+                    "b. Vitreous humor",
+                    "c. Urine",
+                    "d. Blood",
+                    "e. Nails"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "34. Choose correct answers:", 
+                o: [
+                    "a. The Alcohol elimination rate in the vast majority of individuals is between 11 and 13 mg% per hour, with the majority of values lying at the higher end of the curve.",
+                    "b. The Alcohol elimination rate in the vast majority of individuals is between 13 and 18 mg% per hour, with the majority of values lying at the higher end of the curve.",
+                    "c. The Alcohol elimination rate in the vast majority of individuals is between 23 and 38 mg% per hour, with the majority of values lying at the higher end of the curve.",
+                    "d. The Alcohol elimination rate in the vast majority of individuals is between 33 and 38 mg% per hour, with the majority of values lying at the higher end of the curve."
+                ], 
+                a: [1] 
+            },
+            { 
+                t: "35. \"Meese's lines' are:", 
+                o: [
+                    "a. Transverse white bands across the fingernails we can see in chronic arsenic poisoning",
+                    "b. Transverse white bands across the fingernails we can see in acute arsenic poisoning",
+                    "c. Transverse white bands across the fingernails we can see in chronic lithium poisoning",
+                    "d. Transverse white bands across the fingernails we can see in acute lithium poisoning"
+                ], 
+                a: [0] 
+            },
+            { 
+                t: "36. Hemoglobin concentrations of carbon monoxide (carboxyhemoglobin):", 
+                o: [
+                    "a. In smokers, less than 3% total hemoglobin contains CO",
+                    "b. 20-30% of hemoglobin causes headache, nausea, vomiting, and confusion",
+                    "c. 50-60% of hemoglobin causes dizziness, muscle weakness, confusion, rapid heartbeat",
+                    "d. Over 60% of hemoglobin causes seizures, coma, death"
+                ], 
+                a: [1, 3] 
+            },
+            { 
+                t: "37. Prolonged QT interval:", 
+                o: [
+                    "a. An acquired form of this disorder is much less common than the heritable form",
+                    "b. Methadone is perhaps the most notorious of the drugs that produce this syndrome",
+                    "c. Favors the occurrence of a lethal form of ventricular tachycardia"
+                ], 
+                a: [1, 2] 
+            },
+            { 
+                t: "38. Secondary Pedestrian injuries are:", 
+                o: [
+                    "a. Caused by the exact point of contact with the car",
+                    "b. Mainly surface injuries",
+                    "c. Often more serious, and potentially lethal, than the primary injuries"
+                ], 
+                a: [2] 
+            },
+            { 
+                t: "39. Within the UK and Bulgaria child abuse is classified as:", 
+                o: [
+                    "a. Neglect",
+                    "b. Congenital anomalies",
+                    "c. Physical abuse",
+                    "d. Sexual abuse",
+                    "e. Emotional abuse"
+                ], 
+                a: [0, 2, 3, 4] 
+            },
+            { 
+                t: "40. Correct answer for Child physical abuse are:", 
+                o: [
+                    "a. Nonabusive bruises tend to be small, sustained over bony prominences, and found on the front of the body.",
+                    "b. The provalence, number and location of bruising relates to motor development",
+                    "c. Bruises in non-mobile infants, bruises over areas of soft tissues, patterned bruises and multiple similar shape bruises should NOT raise concerns"
+                ], 
+                a: [0, 1] 
+            },
+            { 
+                t: "41. Choose correct answer/s for SIDS:", 
+                o: [
+                    "a. SIDS still forms the most common cause of death in the pre-perinatal period in countries with a relatively low infant mortality rate.",
+                    "b. Most deaths take place between 12 month and 16 months, with a peak at 14 months.",
+                    "c. SIDS still forms the most common cause of death in the post-perinatal period in countries with a relatively low infant mortality rate.",
+                    "d. There is not a sex difference.",
+                    "e. The incidence is markedly greater in multiple births, whether identical or not."
+                ], 
+                a: [2, 4] 
+            },
+            { 
+                t: "42. What are the main features of the SIDS?", 
+                o: [
+                    "a. Most deaths take place between 1 month and 6 months, with a peak at 2 months",
+                    "b. There is little sex difference, although there is a slight preponderance of males similar to that seen in many types of death",
+                    "c. SIDS is far more common in the warmer and dry months",
+                    "d. The incidence is markedly lower in multiple births, whether identical or not."
+                ], 
+                a: [0, 1] 
+            },
+            { 
+                t: "43. The median rate of decrease in blood alcohol concentration is:", 
+                o: [
+                    "a. accepted as around 35 mg per cent (mg%) per hour",
+                    "b. accepted as around 5 mg per cent (mg%) per hour",
+                    "c. accepted as around 25 mg per cent (mg%) per hour",
+                    "d. accepted as around 15 mg per cent (mg%) per hour",
+                    "e. accepted as around 0,5 mg per cent (mg%) per hour"
+                ], 
+                a: [3] 
+            },
+            {
+                t: "44. What is drug withdrawel? (open question)",
+                o: [],
+                a: [],
+                type: 'open',
+                answerText: "Withdrawal is the combination of physical and mental effects that a person experiences after they stop using or reduce the intake of a substance such as alcohol and prescription or recreational drugs."
+            },
+            { 
+                t: "45. Choose correct answer/s:", 
+                o: [
+                    "a. With chronic use, the user becomes less and less responsive to the drug's effects and must increase the dosage.",
+                    "b. This phenomenon is just as much a problem for hospital patients as it is for addicts.",
+                    "c. Tolerance to the pain-relieving effects of morphine emerges quickly, but tolerance to morphine-induced respiratory depression emerges very slowly"
+                ], 
+                a: [0, 1] 
+            }
+        ];
+
+        // --- ENGINE ---
+
+        const container = document.getElementById('quiz-container');
+
+        db.forEach((q, index) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.id = `card-${index}`;
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'question-header';
+            const num = document.createElement('span');
+            num.className = 'question-number';
+            num.innerText = `Question ${index + 1}`;
+            header.appendChild(num);
+            card.appendChild(header);
+
+            // Text
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.innerText = q.t;
+            card.appendChild(text);
+
+            if (q.type === 'open') {
+                // Special handling for Open Question (Q44)
+                const openDiv = document.createElement('div');
+                openDiv.style.fontStyle = "italic";
+                openDiv.style.color = "#555";
+                openDiv.innerText = "This is an open question in the PDF. No checkboxes available.";
+                card.appendChild(openDiv);
+
+                const btn = document.createElement('button');
+                btn.className = 'check-btn';
+                btn.innerText = 'Reveal Answer';
+                btn.onclick = () => {
+                    const fb = document.getElementById(`fb-${index}`);
+                    fb.style.display = 'block';
+                    fb.innerText = q.answerText;
+                };
+                card.appendChild(btn);
+
+            } else {
+                // Standard Multi Checkbox
+                const optionsList = document.createElement('ul');
+                optionsList.className = 'options-list';
+
+                q.o.forEach((opt, optIndex) => {
+                    const li = document.createElement('li');
+                    li.className = 'option-item';
+                    
+                    const label = document.createElement('label');
+                    label.id = `label-${index}-${optIndex}`;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'checkbox'; // MULTIPLE CHOICE
+                    input.name = `q${index}`; 
+                    input.value = optIndex;
+                    
+                    label.appendChild(input);
+                    label.appendChild(document.createTextNode(opt));
+                    
+                    li.appendChild(label);
+                    optionsList.appendChild(li);
+                });
+                card.appendChild(optionsList);
+
+                // Check Button
+                const btn = document.createElement('button');
+                btn.className = 'check-btn';
+                btn.innerText = 'Check Answer';
+                btn.id = `btn-${index}`;
+                btn.onclick = () => check(index, q.a);
+                card.appendChild(btn);
+            }
+
+            // Feedback
+            const feedback = document.createElement('div');
+            feedback.id = `fb-${index}`;
+            feedback.className = 'feedback';
+            card.appendChild(feedback);
+
+            container.appendChild(card);
+        });
+
+        function check(idx, correctIndices) {
+            const checkboxes = document.querySelectorAll(`input[name="q${idx}"]:checked`);
+            const btn = document.getElementById(`btn-${idx}`);
+            const fb = document.getElementById(`fb-${idx}`);
+            
+            // Get user selected indices
+            const userSelected = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (userSelected.length === 0) {
+                // If nothing selected, allow user to know they must select something, 
+                // BUT for "Check Answer" to show correct answers, we can proceed or stop.
+                // Let's proceed to show them what they missed.
+            }
+
+            // Lock UI
+            const allInputs = document.querySelectorAll(`input[name="q${idx}"]`);
+            allInputs.forEach(inp => inp.disabled = true);
+            btn.disabled = true;
+            btn.innerText = "Answered";
+
+            // Validation Logic
+            // 1. Highlight selected Correct (Green)
+            // 2. Highlight selected Wrong (Red)
+            // 3. Highlight Missed Correct (Dashed Green)
+
+            let isPerfect = true;
+
+            // Check correctness of selected items
+            userSelected.forEach(val => {
+                const label = document.getElementById(`label-${idx}-${val}`);
+                if (correctIndices.includes(val)) {
+                    label.classList.add('show-correct-selected');
+                } else {
+                    label.classList.add('show-wrong-selected');
+                    isPerfect = false;
+                }
+            });
+
+            // Check for missing items
+            correctIndices.forEach(correctVal => {
+                if (!userSelected.includes(correctVal)) {
+                    const label = document.getElementById(`label-${idx}-${correctVal}`);
+                    label.classList.add('show-correct-missed');
+                    isPerfect = false;
+                }
+            });
+
+            fb.style.display = 'block';
+            if (isPerfect && userSelected.length === correctIndices.length) {
+                fb.style.backgroundColor = "#e8f5e9";
+                fb.style.color = "#1b5e20";
+                fb.style.borderColor = "#c8e6c9";
+                fb.innerText = "✅ Perfect! All correct answers selected.";
+            } else {
+                fb.style.backgroundColor = "#fff8e1";
+                fb.style.color = "#856404";
+                fb.style.borderColor = "#ffeeba";
+                fb.innerHTML = "<strong>Review Needed:</strong><br>Green = Correctly selected<br>Red = Incorrectly selected<br>Dashed Green = Correct answer you missed";
+            }
+        }
+    </script>
+</body>
+</html>
